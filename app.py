@@ -105,21 +105,21 @@ available_hour = df['Hours'].unique()
 
 #C:\Users\emanu\Desktop\Polito Magistrale\Secondo Anno\Secondo Semestre\Energy services (Erasmus)\Project2\assets
 
-image_directory_clustering = '/Users/emanu/Desktop/Polito Magistrale/Secondo Anno/Secondo Semestre/Energy services (Erasmus)/Project2/assets/Clustering/'
+image_directory_clustering = '/assets/Clustering/'
 list_of_images_clustering = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_clustering))]
 static_image_route_clustering = '/static/'
 
 #static_image_route = '/static/'
 
-image_directory_Feature = '/Users/emanu/Desktop/Polito Magistrale/Secondo Anno/Secondo Semestre/Energy services (Erasmus)/Project2/assets/Feature/'
+image_directory_Feature = '/assets/Feature/'
 list_of_images_Feature = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Feature))]
 static_image_route_Feature = '/static/'
 
-image_directory_Regression = '/Users/emanu/Desktop/Polito Magistrale/Secondo Anno/Secondo Semestre/Energy services (Erasmus)/Project2/assets/Regression/'
+image_directory_Regression = '/assets/Regression/'
 list_of_images_Regression = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Regression))]
 static_image_route_Regression = '/static/'
 
-app.layout = html.Div([    
+app.layout = html.Div([
                                       #main division
     html.H1('Civil Building Monitor'),    #it's an HTML
         html.Img(src='assets/IST-1.png'
