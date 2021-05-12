@@ -107,17 +107,17 @@ available_hour = df['Hours'].unique()
 
 image_directory_clustering = '/assets/Clustering/'
 list_of_images_clustering = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_clustering))]
-static_image_route_clustering = '/static/'
+static_image_route_clustering = '/static1/'
 
 #static_image_route = '/static/'
 
 image_directory_Feature = '/assets/Feature/'
 list_of_images_Feature = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Feature))]
-static_image_route_Feature = '/static/'
+static_image_route_Feature = '/static2/'
 
 image_directory_Regression = '/assets/Regression/'
 list_of_images_Regression = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Regression))]
-static_image_route_Regression = '/static/'
+static_image_route_Regression = '/static3/'
 
 app.layout = html.Div([
                                       #main division
