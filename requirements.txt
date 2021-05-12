@@ -35,13 +35,6 @@ cligj==0.7.1
 cloudpickle==1.6.0
 colorama==0.4.3
 comtypes==1.1.9
-conda==4.10.1
-conda-build==3.20.5
-conda-content-trust==0+unknown
-conda-package-handling==1.7.3
-conda-repo-cli==1.0.3
-conda-token==0.3.0
-conda-verify==3.4.2
 contextlib2==0.6.0.post1
 cryptography==3.4.7
 cycler==0.10.0
