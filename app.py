@@ -1,10 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Apr 30 15:13:51 2021
 
-@author: emanu
-"""
-#%%importing libraries
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -19,117 +13,82 @@ import glob
 import os
 from sklearn.cluster import KMeans
 
-#%% Needed for dash
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']  #External stylesheet
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets,suppress_callback_exceptions=True)   #App creation
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']  
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets,suppress_callback_exceptions=True)   
 
-#%%read the excel file 
-df = pd.read_csv('raw_data_all_cleaned.csv')    #loading data         
-#df_1=pd.read_csv('raw_data_all_features.csv')
+df = pd.read_csv('raw_data_all_cleaned.csv')            
 
-#%%
-# =============================================================================
-# #Data uploading and cleaning - Related to the first project
-# =============================================================================
-
-#Data uploading
 raw_data_Weather=pd.read_csv('IST_meteo_data_2017_2018_2019.csv')
 raw_data_holiday=pd.read_csv('holiday_17_18_19.csv')
 raw_data_Civ_2017=pd.read_csv('IST_Civil_Pav_2017_Ene_Cons.csv')
 raw_data_Civ_2018=pd.read_csv('IST_Civil_Pav_2018_Ene_Cons.csv')
 
+raw_data_Civ_all=pd.merge(raw_data_Civ_2017,raw_data_Civ_2018,how='outer') 
 
-#%%Power data merging for the two years
-raw_data_Civ_all=pd.merge(raw_data_Civ_2017,raw_data_Civ_2018,how='outer') #with outer, the two matrices are merged one after the other
-
-#%% Create a new column 'Date' with the date written in the same way of raw_data_Weather (YYYY-MM-DD)
-#   and making the type 'object' into 'datetime'. 
 raw_data_Civ_all['Date'] = pd.to_datetime(raw_data_Civ_all['Date_start'],format='%d-%m-%Y %H:%M')
 raw_data_Weather['Date'] = pd.to_datetime(raw_data_Weather['yyyy-mm-dd hh:mm:ss'],format='%Y-%m-%d %H:%M:%S') 
 raw_data_holiday['Date'] = pd.to_datetime(raw_data_holiday['Date'],format='%d.%m.%Y')
 
-#%% Delete the redoundant column
 del raw_data_Civ_all['Date_start']
 del raw_data_Weather['yyyy-mm-dd hh:mm:ss']
 
-#%%Rename columns
 raw_data_Civ_all.rename(columns={'Power_kW':'Power [kW]'},inplace=True) #'Date_start':'Date',
 raw_data_Weather.rename(columns={'temp_C':'Temperature [°C]','windSpeed_m/s':'Wind Speed [m/s]','windGust_m/s':'Wind Gust [m/s]','pres_mbar':'Pressure [mbar]','solarRad_W/m2':'Solar Radiation [W/m2]','rain_mm/h':'Rain [mm/h]','rain_day':'Rain Day'},inplace=True)
 
-#%%set the date as index
 raw_data_Civ_all=raw_data_Civ_all.set_index('Date')
 raw_data_Weather=raw_data_Weather.set_index('Date')
 raw_data_holiday=raw_data_holiday.set_index('Date')
 
-#%%Upsample the holiday to then have the merging
-raw_data_holiday=raw_data_holiday.resample('1H').ffill(23)                #resample the holiday file to obtain 1 for each hour of the holiday day
-raw_data_holiday=raw_data_holiday.fillna(0)                               #put 0 if the date is not an holiday (by filling NaN with 0)
+raw_data_holiday=raw_data_holiday.resample('1H').ffill(23)                
+raw_data_holiday=raw_data_holiday.fillna(0)                              
 
-#since there are lots of data, by saving the fine in Excel it is simple to check if the code has worked
+raw_data_Weather=raw_data_Weather.resample('H').mean()           
 
-#%%create a single string per hour computing the mean of each minutes in the hours
-raw_data_Weather=raw_data_Weather.resample('H').mean()           #with the resample, I have some NaN
+raw_data_all=pd.merge(raw_data_Civ_all,raw_data_Weather,on='Date')  
 
-raw_data_all=pd.merge(raw_data_Civ_all,raw_data_Weather,on='Date')  #data merging between weather and power consumption
-
-
-#%%NaN cleaning
 raw_data_all=raw_data_all.dropna()
 raw_data_all=pd.merge(raw_data_all,raw_data_holiday,how='left',on='Date')
 
-#%%Insert the day of the week for each day -> 0 monday 6 sunday
 raw_data_all=raw_data_all.reset_index()                      
-raw_data_all['Week Day']=raw_data_all['Date'].dt.weekday     #extract weekday from date
-raw_data_all['Hours']=raw_data_all['Date'].dt.hour           #extract hours from date
-raw_data_all['Month']=raw_data_all['Date'].dt.month          #extract month from date
+raw_data_all['Week Day']=raw_data_all['Date'].dt.weekday     
+raw_data_all['Hours']=raw_data_all['Date'].dt.hour           
+raw_data_all['Month']=raw_data_all['Date'].dt.month          
 raw_data_all=raw_data_all.set_index(['Date'])                
 
-#the index [date] reset is needed because, otherwise, i cannot extract. Then it is setted again to [Date]
-
-#%% Cleaning columns that are not important 
-raw_data_all=raw_data_all.drop(columns='Wind Speed [m/s]')      #for the energy forecasting, those are not useful in my opinion
+raw_data_all=raw_data_all.drop(columns='Wind Speed [m/s]')     
 raw_data_all=raw_data_all.drop(columns='Wind Gust [m/s]')
 raw_data_all=raw_data_all.drop(columns='Rain [mm/h]')
-raw_data_all=np.around(raw_data_all, decimals=1)                #used to put 1 decimal after the comma, to deal with "real numbers" and not with something with 10 decimals
-#%%
-raw_data_all = raw_data_all[raw_data_all['Power [kW]'] >raw_data_all['Power [kW]'].quantile(0.25) ]  #all the 0 values are removed -> quite impossible to have 0 consumption in a building
-#%%
+raw_data_all=np.around(raw_data_all, decimals=1)               
+
+raw_data_all = raw_data_all[raw_data_all['Power [kW]'] >raw_data_all['Power [kW]'].quantile(0.25) ]  
+
 
 Solar_Rad = raw_data_all.pop('Solar Radiation [W/m2]')
 
-model = KMeans(n_clusters=3).fit(raw_data_all)                #creation of a model based on KMeans with 3 clusters using raw_all_data variable
+model = KMeans(n_clusters=3).fit(raw_data_all)               
 pred = model.labels_
 
 raw_data_all['Cluster']=pred
 
-#rename columns
 df.rename(columns={'Power [kW]':'Power','Temperature [°C]':'Temperature','Pressure [mbar]':'Pressure','Solar Radiation [W/m2]':'G','Week Day':'WeekDay','Rain Day':'RainDay'},inplace=True)
 
-#%% creation of the folders for the results visualization
-
-#single image for the clustering
 image_dpattern= 'assets/Clustering/Daily Pattern.png'
 encoded_image_dailyp = base64.b64encode(open(image_dpattern, 'rb').read())
 
-#initialization of the folder for the images - feature selection
+
 image_directory_Feature = '/Users/emanu/Desktop/Polito Magistrale/Secondo Anno/Secondo Semestre/Energy services (Erasmus)/Project2/assets/Feature/'
 list_of_images_Feature = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Feature))]
 static_image_route_Feature = '/static2/'
 
-#initialization of the folder for the images - regression
+
 image_directory_Regression = '/Users/emanu/Desktop/Polito Magistrale/Secondo Anno/Secondo Semestre/Energy services (Erasmus)/Project2/assets/Regression/'
 list_of_images_Regression = [os.path.basename(x) for x in glob.glob('{}*.png'.format(image_directory_Regression))]
 static_image_route_Regression = '/static3/'
 
-#%%
-# =============================================================================
-# #Application start - main 
-# =============================================================================
-
-app.layout = html.Div([                     #main division
+app.layout = html.Div([                     
                                       
-    html.H1('Civil Building Monitor'),      #heading
-        html.Img(src='assets/IST-1.png'     #IST logo
+    html.H1('Civil Building Monitor'),      
+        html.Img(src='assets/IST-1.png'     
               ,
             style={
                 'height': '10%',
@@ -138,28 +97,21 @@ app.layout = html.Div([                     #main division
             ),
     html.H6('By Emanuele D\'Argenzio - ist1100846'),        #my name
 
-#%%
-# =============================================================================
-# #Tabs identification and definition
-# =============================================================================
-    dcc.Tabs(id='tabs', value='tab1', children=[                    #Here the value states the starting tab when we open the dashboard
+    dcc.Tabs(id='tabs', value='tab1', children=[                    
         dcc.Tab(label='Raw data visualization', value='tab1'),
         dcc.Tab(label='Exploratory Data Analysis', value='tab2'),
         dcc.Tab(label='Clustering', value='tab3'),
         dcc.Tab(label='Feature Selection', value='tab4'), 
         dcc.Tab(label='Regression model and results', value='tab5'),      
     ]), 
-    html.Div(id='tabs-content')     #id to call it in the callback
+    html.Div(id='tabs-content')    
 ])   
 
-#%% From here, the layout for each tab is reported. Then each tabN_layout will be recalled
-
-#layout for the 1st tab - Interactive table
 tab1_layout = html.Div([
                         html.H5('In this table, it is possible to navigate inside the cleaned datas and to sort them in ascending and descending order. '),
                         html.H6('It is also possible to clean some columns, if you don\'t want to see them.'),
                         html.H6('To be noticed: cleaned datas means datas obtained after the feature selection'),
-    dt.DataTable(                         #it is a table
+    dt.DataTable(                         
         id='datatable-interactivity',     
         columns=[
             {"name": i, "id": i, "deletable": True, "selectable": True} for i in df.columns
@@ -175,7 +127,6 @@ tab1_layout = html.Div([
     html.Div(id='datatable-interactivity-container')
 ])
 
-#%%Layout for the 2nd tab - Exploratory data analysis
 tab2_layout= html.Div([
                       html.H5('In this section, different graphs show the datas seen in the table of the first section. Please select the one you want to display:'),
             dcc.Dropdown( 
@@ -191,7 +142,6 @@ tab2_layout= html.Div([
         html.Div(id='Exploratory_data_analysis'),
     ])
 
-#%% Layout for the 3rd tab - clustering
 tab3_layout= html.Div([
                 html.H5('Please, select the clustering model you want to display:'),
             dcc.Dropdown( 
@@ -209,7 +159,6 @@ tab3_layout= html.Div([
         html.Div(id='Clustering_id'),
     ])
 
-#%% Layout for the 4th tab - feature selection
 tab4_layout= html.Div([
                         html.H5('In this section, the feature selection process is reported. In particular, three different models can be selected. The features reported on the X axes are:'),
                         dcc.Markdown('''  *0   Temperature       
@@ -243,8 +192,7 @@ Power-1  '''),
                 )
 
     ])
-                                                       
-#%% Layout for the hth tab forecasting models   
+
 tab5_layout= html.Div([
                             html.H5('In this section, the regression model used are presented. The selected features are'),
                      dcc.Markdown('''
@@ -281,33 +229,14 @@ html.H5('Please, select the model you want to display:'),
             {'label': 'Random forest (regression)', 'value': 777},
             {'label': 'SVR (kernel - rbf)', 'value': 888},
         ],
-        value=111,#, 222, 333, 444, 555, 666, 777, 888],
+        value=111,
         labelStyle={'display': 'inline-block'}
     ),
     html.H6(id='Regression-result-text')
-        #                         dcc.Markdown('''
-                                     
-# Linear Regression (LR.png)                        - results: MAE_LR=21.33 MSE_LR=808.51 RMSE_LR=28.43 cvRMSE_LR=0.138
-
-# Support Vector Regressor, kernel RBF (SVRr.png)   - results MAE_SVR=11.15 MSE_SVR=255.25 RMSE_SVR=15.97 cvRMSE_SVR=0.077 
-
-# Decision tree regressor (DecisionTree.png)        - results: MAE_DT=11.39 MSE_DT=329.86 RMSE_DT=18.16 cvRMSE_DT=0.088
-
-# Random Forest (RF.png)                            - results: MAE_RF=8.80 MSE_RF=172.88 RMSE_RF=13.14 cvRMSE_RF=0.0638
-
-# Gradient Boosting (GB.png)                        - results: MAE_GB=9.45 MSE_GB=187.57 RMSE_GB=13.69 cvRMSE_GB=0.0665
-
-# Extreme Gradient Boosting (EGB.png)               - results: MAE_XGB=8.71 MSE_XGB=170.66 RMSE_XGB=13.06 cvRMSE_XGB=0.0635
-
-# Bootstrapping (Bootstr.png)                       - results: MAE_BT=8.97 MSE_BT=196.31 RMSE_BT=14.01 cvRMSE_BT=0.0682
-
-# Neural Network (Neural.png)                       - results: MAE_NN=13.58 MSE_NN=380.66 RMSE_NN=19.51 cvRMSE_NN=0.0945
-
-# '''),
  
     ])
 
-#%%clustering callback
+
         
 @app.callback(Output('Clustering_id', 'children'), 
               Input('dropdown_clustering', 'value'))
@@ -315,27 +244,27 @@ def render_figure_png(cluster_diff):
     
     if cluster_diff == 1:
         return html.Div([dcc.Graph(
-        figure=px.scatter(raw_data_all,x='Power [kW]', y='Temperature [°C]',                                     #clustering power vs temperature
+        figure=px.scatter(raw_data_all,x='Power [kW]', y='Temperature [°C]',                                     
                         color='Cluster',color_continuous_scale='jet',title='Clustering: Power vs Temperature')
         ),])
     elif cluster_diff == 2:
         return html.Div([        dcc.Graph(id='prova2',
-        figure=px.scatter(raw_data_all,x='Power [kW]', y='Hours',                                                #clustering power vs hours
+        figure=px.scatter(raw_data_all,x='Power [kW]', y='Hours',                                               
                         color='Cluster',color_continuous_scale='jet',title='Clustering: Power vs Hours')
         ),])
     elif cluster_diff == 3:
         return html.Div([dcc.Graph(id='prova3',
-        figure=px.scatter(raw_data_all,x='Power [kW]', y='Week Day',                                              #clustering power vs Week Day
+        figure=px.scatter(raw_data_all,x='Power [kW]', y='Week Day',                                              
                         color='Cluster',color_continuous_scale='jet',title='Clustering: Power vs Week day')
         ),])
     elif cluster_diff == 4:
         return html.Div([dcc.Graph(id='prova4',
-        figure=px.scatter(raw_data_all,x='Hours',y='Power [kW]',                                                  #clustering Hours vs Power
+        figure=px.scatter(raw_data_all,x='Hours',y='Power [kW]',                                                 
                         color='Cluster',color_continuous_scale='jet',title='Clustering: Hours vs Power')
          ),])
     elif cluster_diff == 5:
         return html.Div([        dcc.Graph(id='prova5',
-        figure = px.scatter_3d(raw_data_all,x='Hours',y='Week Day',z='Power [kW]',                                #3D clustering
+        figure = px.scatter_3d(raw_data_all,x='Hours',y='Week Day',z='Power [kW]',                               
                         color='Cluster',color_continuous_scale='jet',height=1000,title='3D Clustering')
         ),])
     elif cluster_diff == 6:
@@ -343,14 +272,14 @@ def render_figure_png(cluster_diff):
         html.Center(html.Img(src='data:image/png;base64,{}'.format(encoded_image_dailyp.decode()))),
         ])
     
- #%%Exploratory data analysis callbacks
+
 @app.callback(Output('Exploratory_data_analysis', 'children'), 
               Input('dropdown_exp', 'value'))
 def render_figure_exp(exp_graphs):
     
     if exp_graphs == 11:
         return html.Div([dcc.Graph(
-              id='PowerTemp',    #graph power vs temp
+              id='PowerTemp',    
                   figure={
                       'data': [
                           {'x': df['Date'], 'y': df['Power'], 'type': 'line', 'name': 'Power [kW]'},
@@ -362,7 +291,7 @@ def render_figure_exp(exp_graphs):
         }
     ),])
     elif exp_graphs == 22:
-        return html.Div([dcc.Graph(               #graph power vs solar radiation
+        return html.Div([dcc.Graph(              
               id='PowerG',
                   figure={
                       'data': [
@@ -375,25 +304,24 @@ def render_figure_exp(exp_graphs):
         },
     ),])
     elif exp_graphs == 33:
-        return html.Div([dcc.Graph(id="prob"),          #probability distribution for the power
+        return html.Div([dcc.Graph(id="prob"),         
     html.P("Distributions"),
-    dcc.RadioItems(                #radio items to select between box,violin,pivot
+    dcc.RadioItems(                
         id='dist-marginal',
         options=[{'label': x, 'value': x} 
                  for x in ['box', 'violin', 'rug']],
         value='box'
     ),])
     elif exp_graphs == 44:
-        return html.Div([ dcc.Graph(id="prob2"),           #probability distribution for the temeprature
+        return html.Div([ dcc.Graph(id="prob2"),      
     html.P("Distributions"),
-    dcc.RadioItems(                  #radio items to select between box,violin,pivot
+    dcc.RadioItems(                  
         id='dist-marginal2',
         options=[{'label': x, 'value': x} 
                   for x in ['box', 'violin', 'rug']],
         value='box'
     ),])
 
-#%% Callback for the power hystogram: possible to select among violin, boxplot and rug
 @app.callback(
     Output("prob", "figure"), 
     [Input("dist-marginal", "value")])
@@ -403,7 +331,7 @@ def display_graph(marginal):
         marginal=marginal,title= 'Probability distribution for the power')
     return fig
 
-#callback for the temperature hystogram : possible to select among violin, boxplot and rug
+
 @app.callback(
     Output("prob2", "figure"), 
 [Input("dist-marginal2", "value")])
@@ -413,7 +341,7 @@ def display_graph_1(marginal):
         marginal=marginal)
     return fig2
 
-#%%feature selection callback
+
 @app.callback(
     dash.dependencies.Output('image-feature', 'src'),
     [dash.dependencies.Input('image-dropdown-feature', 'value')])
@@ -426,7 +354,6 @@ def serve_image_fe(image_path):
         raise Exception('"{}" is excluded from the allowed static files'.format(image_path))
     return flask.send_from_directory(image_directory_Feature, image_name_Feature)
 
-#%%regression model callback
 @app.callback(
     dash.dependencies.Output('image-regression', 'src'),
     [dash.dependencies.Input('image-dropdown-regression', 'value')])
@@ -438,7 +365,7 @@ def serve_image_re(image_path):
     if image_name_regression not in list_of_images_Regression:
         raise Exception('"{}" is excluded from the allowed static files'.format(image_path))
     return flask.send_from_directory(image_directory_Regression, image_name_regression)
-#%%regression model results callback
+ 
 @app.callback(
     Output('Regression-result-text', 'children'),
     [Input('checkboxes', 'value')])
@@ -459,23 +386,23 @@ def update_reg_res(reg_res):
         return html.Div([html.H6('Random Forest (Random Forest.png)                            - results: MAE_RF=8.80 MSE_RF=172.88 RMSE_RF=13.14 cvRMSE_RF=0.0638')])
     elif reg_res==888:
         return html.Div([html.H6('Support Vector Regressor, kernel RBF (SVR - RBF kernel.png)   - results: MAE_SVR=11.15 MSE_SVR=255.25 RMSE_SVR=15.97 cvRMSE_SVR=0.077 ')])
-#%% Tab callback
+
 
 @app.callback(Output('tabs-content', 'children'), #output
               Input('tabs', 'value'))
 
-#command to recall the tabs defined above when selected on the dash
-def render_content(tab):              #used to rendering content of the first tab
-    if tab == 'tab1':                 #create the first tab
-        return tab1_layout            #return the tab layout
-    elif tab == 'tab2':               #create the second tab
-        return tab2_layout            #return the tab layout
-    elif tab == 'tab3':               #create the third tab
-        return tab3_layout            #return the tab layout
-    elif tab == 'tab4':               #create the fourth tab
-        return tab4_layout            #return the fourth tab
-    elif tab == 'tab5':               #create the fifth tab
-        return tab5_layout            #return the fifth tab
+
+def render_content(tab):              
+    if tab == 'tab1':                
+        return tab1_layout           
+    elif tab == 'tab2':               
+        return tab2_layout            
+    elif tab == 'tab3':               
+        return tab3_layout            
+    elif tab == 'tab4':               
+        return tab4_layout            
+    elif tab == 'tab5':               
+        return tab5_layout           
 
 
 if __name__ == '__main__':
